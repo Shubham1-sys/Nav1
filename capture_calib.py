@@ -33,8 +33,8 @@ try:
     picam_L = Picamera2(0)  # cam0 = Left
     picam_R = Picamera2(1)  # cam1 = Right
 
-    config_L = picam_L.create_still_configuration(main={"size": (640, 480)})
-    config_R = picam_R.create_still_configuration(main={"size": (640, 480)})
+    config_L = picam_L.create_still_configuration(main={"size": (1440, 1080)})
+    config_R = picam_R.create_still_configuration(main={"size": (1440, 1080)})
 
     picam_L.configure(config_L)
     picam_R.configure(config_R)
