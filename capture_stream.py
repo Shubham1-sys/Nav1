@@ -1,65 +1,64 @@
 import os
-from os import listdir
+from os import listdir, mkdir
 from os.path import join, exists, splitext
-import io
 import time
-from picamera import PiCamera
-from gpiozero import Button
+from picamera2 import Picamera2
 
+# Define camera roles and paths
+CAMERA_LEFT = 'L'
+CAMERA_RIGHT = 'R'
+BASE_PATH = '/home/blindvision/STEREO_VISION_backup'
+PATH_L = join(BASE_PATH, 'L_stream')  # Left camera stream directory
+PATH_R = join(BASE_PATH, 'R_stream')  # Right camera stream directory
 
-CAMERA = r'R'   
-PATH = join(r'/home/pi/STEREO_VISION', CAMERA + '_calib')
-btn = Button(24)        # GPIO 24 (pin # 18)
+# Ensure directories exist
+os.makedirs(PATH_L, exist_ok=True)
+os.makedirs(PATH_R, exist_ok=True)
 
-if not (exists(PATH)):
-    os.mkdir(PATH)
+def get_next_frame_id():
+    """Get the next sequential frame ID from existing files"""
+    existing_files = [f for f in listdir(PATH_L) if f.endswith(".jpg")]
+    if not existing_files:
+        return 0
+    return max([int(splitext(f)[0]) for f in existing_files]) + 1
 
+def capture_stream():
+    # Initialize cameras
+    picam_L = Picamera2(0)  # Left camera (cam0)
+    picam_R = Picamera2(1)  # Right camera (cam1)
 
-class SplitFrames(object):
-    def __init__(self):
-        self.frame_num = 0
-        self.output = None
+    # Configure both cameras
+    config = picam_L.create_still_configuration(main={"size": (640, 480)})
+    picam_L.configure(config)
+    picam_R.configure(config)
 
+    # Start cameras
+    picam_L.start()
+    picam_R.start()
+    time.sleep(2)  # Warm-up
 
-    def write(self, buf):
-        if buf.startswith(b'\xff\xd8'):
-            # Start of new frame; close the old one (if any) and
-            # open a new output
-            if self.output:
-                self.output.close()
-                # print(self.frame_num, 'closed')
+    frame_id = get_next_frame_id()
 
-            self.frame_num += 1
+    try:
+        while True:
+            input("Press [Enter] to capture a frame (Ctrl+C to exit)...")
+            
+            # Capture synchronized frames
+            fname_L = join(PATH_L, f"{frame_id}.jpg")
+            fname_R = join(PATH_R, f"{frame_id}.jpg")
 
-            self.output = io.open(join(PATH, str(self.frame_num) + '.jpg'), 'wb')
-            self.output.write(buf)
-        else:
-            print('Bad buffer {}'.format(self.frame_num))
+            picam_L.capture_file(fname_L)
+            picam_R.capture_file(fname_R)
+            print(f"Captured pair: {frame_id}.jpg")
 
+            frame_id += 1
 
-try:
-    with PiCamera(resolution=(640,480), framerate=10) as camera:
-        camera.rotation = 180
-        time.sleep(2)
+    except KeyboardInterrupt:
+        print("\nStopped by user.")
+    finally:
+        picam_L.stop()
+        picam_R.close()
+        picam_L.close()
 
-        camera.shutter_speed = camera.exposure_speed
-        camera.exposure_mode = 'off'
-        g = camera.awb_gains
-        camera.awb_mode = 'off'
-        camera.awb_gains = g
-        
-        # Synchronize capture start between L/R devices
-        print('Waiting for button...')
-        btn.wait_for_press()
-        start = time.time()
-        print(f'Starting: {start}')
-
-        output = SplitFrames()
-        camera.start_recording(output, format='mjpeg')
-        camera.wait_recording(10)
-        camera.stop_recording()
-        finish = time.time()
-
-    print('Captured {} frames at {:.2f}fps'.format(output.frame_num, output.frame_num / (finish - start)))
-except (Exception, KeyboardInterrupt) as e:
-    print('\n>> Process Exception ({})'.format(e))
+if __name__ == "__main__":
+    capture_stream()

@@ -2,6 +2,8 @@ from os.path import isfile, join
 import numpy as np
 import cv2 as cv
 from cv2 import ximgproc
+import matplotlib
+matplotlib.use('Agg')  # Force non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -12,10 +14,10 @@ import time
 
 '''Global Variables '''
 
-PATH_L = r'L_stream'
-PATH_R = r'R_stream'
-PATH_CALIB = r'Calibration_Files'
-useStream = 1
+PATH_L = r'/home/blindvision/STEREO_VISION_backup/L_stream'
+PATH_R = r'/home/blindvision/STEREO_VISION_backup/R_stream'
+PATH_CALIB = r'/home/blindvision/projects/Stereo-Camera-Path-Planning/Calibration_Files_expm'
+useStream = 0
 
 ### Stereo Matcher Parameters
 minDisp = 0     # window position x-offset
@@ -40,8 +42,10 @@ undistL = np.loadtxt(join(PATH_CALIB, 'umapL.txt'), dtype=np.float32)
 rectifL = np.loadtxt(join(PATH_CALIB, 'rmapL.txt'), dtype=np.float32)
 undistR = np.loadtxt(join(PATH_CALIB, 'umapR.txt'), dtype=np.float32)
 rectifR = np.loadtxt(join(PATH_CALIB, 'rmapR.txt'), dtype=np.float32)
-roiL = np.loadtxt(join(PATH_CALIB, 'ROIL.txt'), dtype=np.int)
-roiR = np.loadtxt(join(PATH_CALIB, 'ROIR.txt'), dtype=np.int)
+# roiL = np.loadtxt(join(PATH_CALIB, 'ROIL.txt')).astype(int)
+# roiR = np.loadtxt(join(PATH_CALIB, 'ROIR.txt')).astype(int)
+roiL = np.array([0, 0, 640, 480])  # Full image ROI for Left
+roiR = np.array([0, 0, 640, 480]) 
 Q = np.loadtxt(join(PATH_CALIB, 'Q.txt'), dtype=np.float32)
 #R = np.loadtxt(join(PATH_CALIB, 'Rtn.txt'), dtype=np.float32)
 #T = np.loadtxt(join(PATH_CALIB, 'Trnsl.txt'), dtype=np.float32)
@@ -55,8 +59,8 @@ DL = np.loadtxt(join(PATH_CALIB, 'DcL.txt'), dtype=np.float32)
 
 
 def main():
-    streamFrames = range(50, 105 + 1)
-    imgPairId = '55.jpg'
+    streamFrames = range(0, 17 + 1)
+    imgPairId = '10.jpg'
 
     if not (isfile(join(PATH_L, imgPairId)) and isfile(join(PATH_R, imgPairId))):
         print('Image', imgPairId, 'not found')
@@ -73,13 +77,18 @@ def main():
             plt.pause(0.2)
     else:
         compute_disparity(imgPairId, params)
-        plt.show()
+        plt.savefig(f'path_{imgPairId}')
+        plt.close()
 
 
 def rescaleROI(src, roi):
     x, y, w, h = roi
-    dst = src[y:y+h, x:x+w]
-    return dst
+    h_img, w_img = src.shape[:2]  # Get actual image dimensions
+    x = max(0, min(x, w_img - 1))
+    y = max(0, min(y, h - 1))
+    w = max(0, min(w, w_img - x))
+    h = max(0, min(h, h_img - y))
+    return src[y:y+h, x:x+w]
 
 
 def compute_disparity(imgId, params):
@@ -88,6 +97,10 @@ def compute_disparity(imgId, params):
     imgIdR = str(imgIdR) + '.jpg'
     imgR = cv.imread(join(PATH_R, imgIdR))
     #print(imgL.dtype)
+
+    if imgL is None or imgR is None:
+        print(f"Error: Failed to load {imgId} or {imgIdR}")
+        return
 
     imgL = cv.remap(imgL, undistL, rectifL, cv.INTER_LINEAR)
     imgR = cv.remap(imgR, undistR, rectifR, cv.INTER_LINEAR)
@@ -147,12 +160,48 @@ def compute_disparity(imgId, params):
     # print(f'dtype Raw Disparity: {dispL.dtype}')
     # print(f'dtype WLS Disparity: {dispFinal.dtype}')
     # print(f'dtype reprojected3D: {points3d.dtype}')
-    
+
+    if points3d.ndim != 3 or points3d.shape[2] != 3:
+        print("Error: Invalid 3D points shape")
+        return
+    print(dispFinal)
+    print(points3d)
     ''' Filter obstacles, compute occupancy grid, find path '''
     find_path(imgId, nDisp, points3d, dispFinal, cost_sgbm)
     
     ### Show Disparity Maps
     #display_disparity(imgL, dispL, dispFinal, imgId, paramsVals)
+
+# def compute_disparity(imgId, params):
+#     imgL = cv.imread(join(PATH_L, imgId))
+#     imgIdR = str(int(imgId.split('.')[0])) + '.jpg'  # Remove +1 offset
+#     imgR = cv.imread(join(PATH_R, imgIdR))
+
+#     # Add error checking
+#     if imgL is None or imgR is None:
+#         print(f"Error loading images: {imgId} | {imgIdR}")
+#         return
+
+#     # Rectify images
+#     imgL = cv.remap(imgL, undistL, rectifL, cv.INTER_LINEAR)
+#     imgR = cv.remap(imgR, undistR, rectifR, cv.INTER_LINEAR)
+
+#     # Rescale ROI with bounds checking
+#     def safe_rescale(src, roi):
+#         x, y, w, h = roi
+#         x = max(0, min(x, src.shape[1]))
+#         y = max(0, min(y, src.shape[0]))
+#         w = max(0, min(w, src.shape[1] - x))
+#         h = max(0, min(h, src.shape[0] - y))
+#         return src[y:y+h, x:x+w]
+
+#     imgL = safe_rescale(imgL, roiL)
+#     imgR = safe_rescale(imgR, roiR)
+
+#     # Add fallback for empty images
+#     if imgL.size == 0 or imgR.size == 0:
+#         print("Empty ROI detected - check calibration files")
+#         return
 
 
 def find_path(imgId, nDisp, points3d, disparityMap, cost_sgbm):
@@ -168,11 +217,11 @@ def find_path(imgId, nDisp, points3d, disparityMap, cost_sgbm):
     y = np.mgrid[0:np.amax(obstacles), 0:obs.shape[1]][0,:,:]
 
     ### Assign weights to regions (cost low -> high == 0.01 -> 2)
-    occupancy_grid = np.where(y >= obstacles, 0, 1)
-    occupancy_grid[:, :nDisp+60] = 0
+    occupancy_grid = np.where(obstacles < 1.5, 1, 0)  # 1=obstacle, 0=free
+    occupancy_grid[:, :int(nDisp*0.6)] = 0  #
     # occupancy_grid[:, nDisp:nDisp+40] = 0
     # occupancy_grid[:, -80:] = 0
-
+    cv.imwrite(f'occupancy_{imgId}.png', (occupancy_grid * 255).astype(np.uint8))
     # far_zy, far_zx = np.unravel_index(np.argmax(np.flip(occupancy_grid)), occupancy_grid.shape)
     # far_zx = (zz.shape[1]-1) - far_zx
     far_zy, far_zx = np.unravel_index(np.argmax(np.flip(occupancy_grid[:,:-90])), occupancy_grid[:,:-90].shape)
@@ -207,8 +256,14 @@ def find_path(imgId, nDisp, points3d, disparityMap, cost_sgbm):
     # print(f'A* nodes: ({xcenter}, 1) to ({far_zx}, {far_zy})')
         
     xcenter = 305
-    
+    print(f"Grid dimensions: {occupancy_grid.shape}")
+    print(f"Start node: ({xcenter}, 1)")
+    print(f"End node: ({far_zx}, {far_zy})")
     ''' A* path-finding config and computation '''
+    if not start.walkable:
+        print("Start node is blocked!")
+    if not end.walkable:
+        print("End node is blocked!")
     mat_grid = Grid(matrix=occupancy_grid)
     start = mat_grid.node(xcenter, 1)
     end = mat_grid.node(far_zx, far_zy)
@@ -220,6 +275,7 @@ def find_path(imgId, nDisp, points3d, disparityMap, cost_sgbm):
     
     if len(path) == 0:
         print('ERROR: No path found')
+        return
 
     ''' Map X,Y pixel positions to world-frame for cv.projectPoints() '''
     coords = np.array([(xp, zp) for xp, zp in path], dtype=np.int32)
@@ -231,7 +287,12 @@ def find_path(imgId, nDisp, points3d, disparityMap, cost_sgbm):
     yworld = np.geomspace(10,13, num=len(path), dtype=np.float32)
     #yworld = np.flip(yworld)
     # yworld = yy[yrange, coords[:,0]]
-    xworld = xx[yrange, coords[:,0]]
+    if coords.size == 0:
+        print("No coordinates to process")
+        return
+    x_indices = coords[:, 0].astype(int)
+    y_indices = yrange.astype(int)
+    xworld = xx[y_indices, x_indices]
     zworld = np.array([zp for _, zp in path], dtype=np.float32)
     zworld = np.interp(zworld, [0, np.amax(zworld)], [25, nDisp])
     
@@ -301,6 +362,7 @@ def display_disparity(origImg, dispRaw, dispWLS, imgName, paramsVals):
     ''' Helper function to show figure with some parameters '''
 
     # Show parameters on figure for debugging
+    print("saving disparity")
     paramsText = 'Lambda={}; Sigma={}; nDisp={}; bSize={}; pfCap={}; sRange={}'.format(*paramsVals)
 
     fig, (ax1, ax2, ax3) = plt.subplots(figsize=(12, 4), ncols=3)
@@ -319,7 +381,8 @@ def display_disparity(origImg, dispRaw, dispWLS, imgName, paramsVals):
     cbar3 = fig.colorbar(pl3, ax=ax3, fraction=0.034, pad=0.04)
     cbar3.minorticks_on()
     plt.tight_layout()
-    plt.show()
+    plt.savefig('disparity_output.png')  # Replace plt.show()
+    plt.close()
 
 
 main()

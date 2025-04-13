@@ -9,4 +9,5 @@ dependencies = [
     "opencv-contrib-python>=4.11.0.86",
     "pathfinding>=1.0.16",
     "picamera2>=0.3.25",
+    "tk>=0.1.0",
 ]
