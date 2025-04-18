@@ -7,7 +7,7 @@ from picamera2 import Picamera2
 # Define camera roles and paths
 CAMERA_LEFT = 'L'
 CAMERA_RIGHT = 'R'
-BASE_PATH = '/home/blindvision/STEREO_VISION_backup'
+BASE_PATH = '/home/blindvision/STEREO_VISION'
 PATH_L = join(BASE_PATH, 'L_stream')  # Left camera stream directory
 PATH_R = join(BASE_PATH, 'R_stream')  # Right camera stream directory
 
@@ -24,11 +24,11 @@ def get_next_frame_id():
 
 def capture_stream():
     # Initialize cameras
-    picam_L = Picamera2(0)  # Left camera (cam0)
-    picam_R = Picamera2(1)  # Right camera (cam1)
+    picam_L = Picamera2(1)  # Left camera (cam0)
+    picam_R = Picamera2(0)  # Right camera (cam1)
 
     # Configure both cameras
-    config = picam_L.create_still_configuration(main={"size": (640, 480)})
+    config = picam_L.create_still_configuration(main={"size": (1640, 1232)})
     picam_L.configure(config)
     picam_R.configure(config)
 

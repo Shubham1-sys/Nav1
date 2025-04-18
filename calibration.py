@@ -5,7 +5,7 @@ from os.path import join, isdir
 import matplotlib.pyplot as plt
 
 ### Paths
-ROOT = r'/home/blindvision/STEREO_VISION_backup'
+ROOT = r'/home/blindvision/STEREO_VISION'
 output_id = '0.jpg'
 
 
@@ -31,14 +31,14 @@ file_list = [i for i in listdir(join(ROOT, 'L_calib'))]
 file_list.sort(key=sort_id)
 
 # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-objp = np.zeros((5*8, 3), np.float32)
-objp[:, :2] = np.mgrid[0:8, 0:5].T.reshape(-1, 2)
+objp = np.zeros((6*9,3), np.float32)
+objp[:,:2] = np.mgrid[0:9,0:6].T.reshape(-1,2)
 
 # Store computed points
 objPts = []
 imgPL, imgPR = [], []
 
-imgSize = (640, 480) # (768, 1024), 1296x972
+imgSize = (1640, 1232) # (768, 1024), 1296x972
 
 
 for f in file_list:
@@ -49,8 +49,8 @@ for f in file_list:
     grayL = cv.cvtColor(imgL, cv.COLOR_RGB2GRAY)
     grayR = cv.cvtColor(imgR, cv.COLOR_RGB2GRAY)
     # h,w = grayL.shape
-    retL, cornersL = cv.findChessboardCorners(grayL, (8, 5), flags=flags_thresh)
-    retR, cornersR = cv.findChessboardCorners(grayR, (8, 5), flags=flags_thresh)
+    retL, cornersL = cv.findChessboardCorners(grayL, (9,6), flags=flags_thresh)
+    retR, cornersR = cv.findChessboardCorners(grayR, (9,6), flags=flags_thresh)
 
     if retL and retR:
         objPts.append(objp)
@@ -63,11 +63,11 @@ for f in file_list:
         ### Draw and output file of detected points
         # if f == output_id:
         #     cv.imwrite(r'L_' + fname, imgL)
-        #     cv.drawChessboardCorners(imgL, (8, 5), corners2L, retL)
+        #     cv.drawChessboardCorners(imgL, (9,6), corners2L, retL)
         #     cv.imwrite(r'GRID_L_' + fname, imgL)
 
         #     cv.imwrite(r'R_' + fname, imgR)
-        #     cv.drawChessboardCorners(imgR, (8, 5), corners2R, retR)
+        #     cv.drawChessboardCorners(imgR, (9,6), corners2R, retR)
         #     cv.imwrite(r'GRID_R_' + fname, imgR)
         #     cv.waitKey(500)
         #     print(f'OUTPUT: {f}')
@@ -161,7 +161,7 @@ undistR, rectifR = cv.initUndistortRectifyMap(CR, DR, RR, PR, imgSize, cv.CV_32F
 # img1 = cv.remap(img1, undistL, rectifL, cv.INTER_LINEAR, borderMode=cv.BORDER_CONSTANT)
 # img2 = cv.remap(img2, undistR, rectifR, cv.INTER_LINEAR, borderMode=cv.BORDER_CONSTANT)
 
-# plt.figure(figsize=(8, 5))
+# plt.figure(figsize=(9,6))
 # plt.subplot(221); plt.imshow(img1); plt.title('remap_L: ' + str(img1.shape))
 # plt.subplot(222); plt.imshow(img2); plt.title('remap_R: ' + str(img2.shape))
 
